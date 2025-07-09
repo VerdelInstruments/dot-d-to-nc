@@ -194,6 +194,10 @@ def save_to_netcdf(data_array, file_name):
     data_array.to_netcdf(file_name)
 
 
+def extract(d_directory, save_location):
+    config_file = Path(d_directory) / 'current_config.ini'
+    return extract_data(config_file, d_directory, save_location)
+
 def extract_data(config_file, d_directory, save_location):
     """Main function to extract data and save time-domain and Fourier-domain results."""
     # Initialise Baf2Sql
@@ -201,7 +205,6 @@ def extract_data(config_file, d_directory, save_location):
     # dll_path = get_resource_path("data_handling/baf2sql_lib") / dll_file
     dll_path = Path(__file__).parent / 'baf2sql_c.dll'
 
-    print(dll_path)
     baf2sql = Baf2Sql(dll_path)
 
     # Load configuration

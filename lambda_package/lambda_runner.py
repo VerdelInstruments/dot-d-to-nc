@@ -8,13 +8,15 @@ from ctypes import *
 import numpy as np
 import xarray as xr
 import pyfftw
-import boto3
-
-s3 = boto3.client('s3')
-
 
 def get_library_path():
-    return Path(__file__).parent / 'libbaf2sql_c.so'
+    file =  Path(__file__).parent / 'libbaf2sql_c.so'
+    print(f'finding file at {file}')
+    if not file.exists():
+        raise FileNotFoundError(f"Library file not found at {file}")
+    return file
+
+
 
 class Baf2Sql:
 
@@ -129,6 +131,13 @@ def load_config(config_file):
     """Load and parse the configuration file."""
     config = configparser.ConfigParser()
     config.read(config_file)
+
+    # Print out all sections and keys
+    print("Sections:", config.sections())
+    for section in config.sections():
+        print(f"[{section}]")
+        for key, value in config[section].items():
+            print(f"{key} = {value}")
     unique_swim_ids = int(config["SWIM.settings"]["unique_swim_ids"])
     instrument_frequency = float(config["instrument.settings"]["instrument_frequency"])
     return unique_swim_ids, instrument_frequency
@@ -248,34 +257,3 @@ def extract_data(config_file, d_directory, save_location):
     return file_name
 
 
-def handler(event, context):
-    # Extract bucket name and object key from the S3 event
-    record = event['Records'][0]
-    bucket = record['s3']['bucket']['name']
-    key = record['s3']['object']['key']
-
-    local_zip_path = f"/tmp/{Path(key).name}"
-
-    # Download the zipped .d directory from S3
-    s3.download_file(bucket, key, local_zip_path)
-
-    # Unzip to /tmp
-    with zipfile.ZipFile(local_zip_path, 'r') as zip_ref:
-        extracted_path = f"/tmp/{Path(key).stem}"
-        zip_ref.extractall(extracted_path)
-
-    # Create output path
-    output_path = f"/tmp/{Path(key).stem}_output"
-    os.makedirs(output_path, exist_ok=True)
-
-    # Call your extract function
-    result_file = extract(extracted_path, output_path)
-
-    # Upload result to S3
-    result_key = f"nc_files/{Path(result_file).name}"
-    s3.upload_file(result_file, bucket, result_key)
-
-    return {
-        "statusCode": 200,
-        "body": f"Output file uploaded to s3://{bucket}/{result_key}"
-    }
