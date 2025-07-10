@@ -80,7 +80,7 @@ class Baf2Sql:
         )
 
         if len == 0:
-            self.throw_last_error(self.dll)
+            self.throw_last_error()
 
         buffer = create_string_buffer(len)
         self.dll.baf2sql_get_sqlite_cache_filename_v2(
@@ -230,7 +230,8 @@ def extract_data(config_file, d_directory, save_location):
     baf2sql = Baf2Sql(dll_path)
 
     # Load configuration
-    unique_swim_ids, instrument_frequency = load_config(config_file)
+    # unique_swim_ids, instrument_frequency = load_config(config_file)
+    unique_swim_ids, instrument_frequency = 1025, 1
 
     # Setup SQLite connection
     conn, baf_filename = setup_sqlite_connection(d_directory, baf2sql)
