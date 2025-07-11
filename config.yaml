@@ -1,3 +1,4 @@
 s3:
   bucket: verdel-nc
   zipped_file_directory: zipped
+  nc_file_directory: nc

@@ -1,3 +1,75 @@
+import boto3
+
+from pathlib import Path
+import os
+import zipfile
+
+# from lambda_runner import extract, extract_data
+
+s3 = boto3.client('s3')
+
+
+def _extract(d_directory, save_location):
+    # config_file = Path(__file__).parent / 'current_config.ini'
+    config_file = None
+
+    data = extract_data(config_file, d_directory, save_location)
+    print('extracted data:', data)
+    return data
+
+
+def handler(event, context):
+    # Extract bucket name and object key from the S3 event
+    record = event['Records'][0]
+    bucket = record['s3']['bucket']['name']
+    key = record['s3']['object']['key']
+
+    print("EVENT RECEIVED: ", event)
+
+    local_zip_path = f"/tmp/{Path(key).name}"
+
+    # Download the zipped .d directory from S3
+    # s3.download_file(bucket, key, local_zip_path)
+
+    # print("HANDLER: Downloaded file from S3 to", local_zip_path)
+    #
+    # # Unzip to /tmp
+    # with zipfile.ZipFile(local_zip_path, 'r') as zip_ref:
+    #     extracted_path = f"/tmp/{Path(key).stem}"
+    #     zip_ref.extractall(extracted_path)
+    #
+    # extracted_path = "/Users/joseph/Downloads/250702_davaoH2O_021.d"
+    extracted_path = "/input_data"
+
+    print(f"HANDLER: path available: {Path(extracted_path).exists()}")
+    print("HANDLER: Unzipped file to", extracted_path)
+
+    print(os.listdir(extracted_path))
+
+    # Create output path
+    output_path = f"/tmp/{Path(key).stem}_output"
+    os.makedirs(output_path, exist_ok=True)
+
+    print("HANDLER: Created output directory at", output_path)
+
+
+    # Call your extract function
+    result_file = _extract(extracted_path, output_path)
+
+    print("HANDLER: Extraction complete, result file is", result_file)
+
+    # Upload result to S3
+    result_key = f"nc_files/{Path(result_file).name}"
+    print("RESULT KEY:", result_key)
+    s3.upload_file(result_file, bucket, result_key)
+
+    print("HANDLER: Uploaded result file to S3 at", result_key)
+
+    return {
+        "statusCode": 200,
+        "body": f"Output file uploaded to s3://{bucket}/{result_key}"
+    }
+
 import configparser
 import sqlite3
 import os
@@ -10,7 +82,13 @@ import xarray as xr
 import pyfftw
 
 def get_library_path():
-    return Path(__file__).parent / 'libbaf2sql_c.so'
+    file =  Path(__file__).parent / 'libbaf2sql_c.so'
+    print(f'finding file at {file}')
+    if not file.exists():
+        raise FileNotFoundError(f"Library file not found at {file}")
+    return file
+
+
 
 class Baf2Sql:
 
@@ -74,7 +152,7 @@ class Baf2Sql:
         )
 
         if len == 0:
-            self.throw_last_error(self.dll)
+            self.throw_last_error()
 
         buffer = create_string_buffer(len)
         self.dll.baf2sql_get_sqlite_cache_filename_v2(
@@ -125,6 +203,13 @@ def load_config(config_file):
     """Load and parse the configuration file."""
     config = configparser.ConfigParser()
     config.read(config_file)
+
+    # Print out all sections and keys
+    print("Sections:", config.sections())
+    for section in config.sections():
+        print(f"[{section}]")
+        for key, value in config[section].items():
+            print(f"{key} = {value}")
     unique_swim_ids = int(config["SWIM.settings"]["unique_swim_ids"])
     instrument_frequency = float(config["instrument.settings"]["instrument_frequency"])
     return unique_swim_ids, instrument_frequency
@@ -141,13 +226,25 @@ def setup_sqlite_connection(d_directory, baf2sql):
 def extract_time_domain_data(conn, unique_swim_ids, profile_mz, binary_storage):
     """Extract time-domain data from SQLite and populate an xarray DataArray."""
     query = conn.execute("SELECT Rt, ProfileMzId, ProfileIntensityId FROM Spectra")
+    print(query)
     rows = query.fetchall()
 
+    print("Number of rows fetched:", len(rows))
+    #
+    # time_domain = xr.DataArray(
+    #     dims=["swim_id", "mass_charge"],
+    #     coords={"swim_id": range(1, unique_swim_ids + 1), "mass_charge": profile_mz},
+    #     name="intensity",
+    # ).fillna(0)
+
     time_domain = xr.DataArray(
+        data=np.zeros((unique_swim_ids, len(profile_mz))),  # or np.full(...) if you want NaNs
         dims=["swim_id", "mass_charge"],
         coords={"swim_id": range(1, unique_swim_ids + 1), "mass_charge": profile_mz},
         name="intensity",
-    ).fillna(0)
+    )
+
+    print("Initialized time_domain DataArray with shape:", time_domain.shape)
 
     swim_id = 1
     for ii, row in enumerate(rows):
@@ -162,23 +259,58 @@ def extract_time_domain_data(conn, unique_swim_ids, profile_mz, binary_storage):
             swim_id += 1
         swim_id += 1
 
-    return time_domain.astype("int")
+    print("Final shape of time_domain DataArray:", time_domain.shape)
+    return time_domain#.astype("int")
 
 
 def compute_fft(time_domain, unique_swim_ids, profile_mz, instrument_frequency):
     """Compute FFT on the time-domain data."""
-    time_domain_np = time_domain.to_numpy()
+    # time_domain_np = time_domain.to_numpy()
+    print('got time domain numpy array with shape:', time_domain.shape)
 
     in_array = pyfftw.empty_aligned(
         (unique_swim_ids, len(profile_mz)), dtype=np.float32
     )
+
+    print('created input array with shape:', in_array.shape)
+
+
     out_array = pyfftw.empty_aligned(
         (unique_swim_ids // 2 + 1, len(profile_mz)), dtype=np.complex64
     )
 
-    in_array[:, :] = time_domain_np - time_domain_np.mean(axis=0, keepdims=True)
+    print('created output array with shape:', out_array.shape)
+
+    # mean = time_domain_np.mean(axis=0, keepdims=True)_
+
+    # in_array[:, :] = time_domain_np - time_domain_np.mean(axis=0, keepdims=True)
+    # np.subtract(
+    #     time_domain_np,
+    #     time_domain_np.mean(axis=0, keepdims=True),
+    #     out=in_array
+    # )
+
+    print(type(time_domain))
+    mean = time_domain.values.mean(axis=0, keepdims=True)
+    print(mean.shape, mean.dtype)
+
+    print(time_domain.shape, time_domain.dtype)
+    # in_array = time_domain - mean
+    np.subtract(time_domain, mean, out=in_array)
+    # batch the mean subtraction to avoid memory issues
+    # chunk_size = 10000
+    # for i in range(0, time_domain.shape[1], chunk_size):
+    #     print(i)
+    #     sl = slice(i, i + chunk_size)
+    #     np.subtract(time_domain.values[:, sl], mean[:, sl], out=in_array[:, sl])
+
+    print('input array mean subtracted, now performing FFT')
     swim_fft = pyfftw.FFTW(in_array, out_array, axes=(0,))
+
+    print('FFT setup complete, executing FFT')
     fft_result = swim_fft()
+
+    print('FFT execution complete, result shape:', fft_result.shape)
 
     fourier_domain = xr.DataArray(
         data=np.absolute(fft_result) ** 2,
@@ -190,21 +322,14 @@ def compute_fft(time_domain, unique_swim_ids, profile_mz, instrument_frequency):
         name="amplitude",
     )
 
+    print('Created Fourier domain DataArray with shape:', fourier_domain.shape)
+
     return fourier_domain
 
 
 def save_to_netcdf(data_array, file_name):
     """Save xarray DataArray to a NetCDF file."""
     data_array.to_netcdf(file_name)
-
-
-
-def extract(d_directory, save_location):
-    config_file = Path(d_directory) / 'current_config.ini'
-    return extract_data(config_file, d_directory, save_location)
-
-
-
 
 
 def extract_data(config_file, d_directory, save_location):
@@ -214,13 +339,20 @@ def extract_data(config_file, d_directory, save_location):
     # dll_path = get_resource_path("data_handling/baf2sql_lib") / dll_file
     dll_path = get_library_path()
 
+    print('got library path:', dll_path)
+
     baf2sql = Baf2Sql(dll_path)
 
     # Load configuration
-    unique_swim_ids, instrument_frequency = load_config(config_file)
+    # unique_swim_ids, instrument_frequency = load_config(config_file)
+    unique_swim_ids, instrument_frequency = 2048, 1
+
+    print('got swim ids')
 
     # Setup SQLite connection
     conn, baf_filename = setup_sqlite_connection(d_directory, baf2sql)
+
+    print("connection set up: ", conn)
 
     # Load BinaryStorage and profile mz
     bs = BinaryStorage(baf2sql, baf_filename)
@@ -228,19 +360,53 @@ def extract_data(config_file, d_directory, save_location):
         conn.execute("SELECT ProfileMzId FROM Spectra").fetchone()[0]
     )
 
+    print("Profile m/z loaded:", profile_mz)
+
     # Extract time-domain data
     time_domain = extract_time_domain_data(conn, unique_swim_ids, profile_mz, bs)
 
+
+    print("Time-domain data extracted with shape:", time_domain.shape)
+
     # Save time-domain data
     file_name = os.path.join(save_location, f"{Path(d_directory).stem}_timedomain.nc")
+
+    print("Saving time-domain data to:", file_name)
     save_to_netcdf(time_domain, file_name)
+    print('saved time-domain data')
 
     # Compute and save Fourier-domain data
     fourier_domain = compute_fft(
         time_domain, unique_swim_ids, profile_mz, instrument_frequency
     )
+
+    print("Fourier-domain data computed with shape:", fourier_domain.shape)
+
+
+
     save_to_netcdf(fourier_domain, file_name.replace("_timedomain", "_fourierdomain"))
+
+    print('saved fourier-domain data')
 
     return file_name
 
 
+
+
+if __name__ == "__main__":
+    # Simulate Lambda event
+    result = handler({
+  "Records": [
+    {
+      "s3": {
+        "bucket": {
+          "name": "verdel-nc"
+        },
+        "object": {
+          "key": "zipped/250702_davaoH2O_021.d.zip"
+        }
+      }
+    }
+  ]
+}, {})  # mock event/context
+    print(result)

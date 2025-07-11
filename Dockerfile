@@ -15,13 +15,11 @@ WORKDIR /var/task
 
 # Copy files
 COPY . .
-COPY ./lambda_package/libbaf2sql_c.so .
-COPY ./lambda_package/lambda_handler.py .
-COPY ./lambda_package/lambda_runner.py .
-
+#COPY src/libbaf2sql_c.so .
+#COPY src/lambda_handler.py .
+#COPY src/lambda_runner.py .
 
 # Install Python requirements
 RUN pip install -r requirements.txt
 
-# Default command for debugging or Lambda-style call
-CMD ["python3", "lambda_handler.py"]
+CMD ["python3", "./src/lambda_handler.py"]
