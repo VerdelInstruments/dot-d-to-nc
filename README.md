@@ -43,6 +43,7 @@ output directory `OUTPUT`.
 
 
 
+
 ### Docker (for Mac users)
 
 Since the Bruker software is not available for Mac, you can use Docker to run the code in a 
