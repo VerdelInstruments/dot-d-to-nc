@@ -1,17 +1,18 @@
 # dot_d_to_nc
 
-This repository contains functions that allow a Bruker .d directory to be converted into a 
-NetCDF file. 
+This repository contains functions that allow a Bruker .d directory, or a series of them,  to be 
+converted into a NetCDF file. 
 
-The project is wrapped up using Docker, because Bruker only package their compiled C software for 
-Linux and Windows. The Docker implementation uses Linux and the corresponding .so. 
+Because Bruker only compile their code for Linux and Windows, this repository contains a 
+Dockerfile that can be used to spin up a container on MacOS that will successfully run the 
+file conversion. 
 
 ## Usage
 
 ### Windows, Linux 
 
 If you are on Windows or Linux AMD64 you can run the code directly. You will need to install the 
-requirements using 
+required Python packages using 
 
 ```python
 pip install -r requirements.txt
@@ -24,6 +25,12 @@ file, you can use the flag ```--single``` and run the following command in the r
 python ./src/extract.py --single INPUT.d OUTPUT
 ```
 
+where `INPUT.d` is the path to the Bruker .d directory and `OUTPUT` is the path where you want 
+the output NetCDF files to be saved. Two output files will be placed in the output 
+directory: the '_timedomain.nc' and '_fourier_domain.nc' files. These filenames are preceded by 
+the name of the input ```.d``` directory.
+
+
 Alternatively, if you have multiple .d directories that you want to process, you can use the 
 --directory flag and run the following command:
 
@@ -33,11 +40,6 @@ python ./src/extract.py --directory INPUT_DIR OUTPUT
 This will process all the .d directories in the `INPUT_DIR` directory and save the output in the 
 output directory `OUTPUT`.
 
-
-where `INPUT.d` is the path to the Bruker .d directory and `OUTPUT` is the path where you want 
-the output NetCDF files to be saved. Two output files per input file will be placed in this 
-directory: the '_timedomain.nc' and '_fourier_domain.nc' files. These filenames are preceded by 
-the name of the input ```.d``` directory.
 
 
 
