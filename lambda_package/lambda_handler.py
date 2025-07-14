@@ -263,7 +263,99 @@ def extract_time_domain_data(conn, unique_swim_ids, profile_mz, binary_storage):
     return time_domain#.astype("int")
 
 
-def compute_fft(time_domain, unique_swim_ids, profile_mz, instrument_frequency):
+import numpy as np
+import xarray as xr
+import pyfftw
+
+def compute_fft_efficient(time_domain, unique_swim_ids, profile_mz, instrument_frequency):
+    """
+    Compute FFT on the time-domain data.
+
+    Parameters:
+    - time_domain: xarray DataArray containing time-domain data.
+    - unique_swim_ids: Number of unique SWIM IDs.
+    - profile_mz: Array of m/z values.
+    - instrument_frequency: Frequency of the instrument.
+
+    Returns:
+    - xarray DataArray containing the Fourier domain representation.
+    """
+
+    n_freqs = unique_swim_ids // 2 + 1
+    n_mz = len(profile_mz)
+
+    freq_axis = np.fft.rfftfreq(unique_swim_ids, instrument_frequency)
+    result = np.empty((n_freqs, n_mz), dtype=np.float32)
+
+    fft_input = pyfftw.empty_aligned(unique_swim_ids, dtype=np.float32)
+    fft_output = pyfftw.empty_aligned(n_freqs, dtype=np.complex64)
+    fft = pyfftw.FFTW(fft_input, fft_output, axes=(0,))
+
+    for i, mz in enumerate(profile_mz):
+        signal = time_domain.isel({"mass_charge": i}).values.astype(np.float64)
+        signal -= signal.mean()  # Remove DC component
+
+        fft_input[:] = signal
+
+        # runs the fft and stores it in fft_output
+        fft()
+
+        result[:, i] = np.abs(fft_output) ** 2
+
+    return xr.DataArray(
+        data=result,
+        dims=["frequency", "mass_charge"],
+        coords={
+            "frequency": freq_axis,
+            "mass_charge": profile_mz
+        },
+        name="amplitude"
+    )
+
+
+def compute_ff0___t(time_domain, unique_swim_ids, profile_mz, instrument_frequency):
+    """Compute FFT on the time-domain data trace-by-trace (per mass_charge)."""
+
+    n_freq = unique_swim_ids // 2 + 1
+    n_mz = len(profile_mz)
+
+    print('Time domain shape:', time_domain.shape)
+
+    # Pre-allocate output
+    fft_power = np.empty((n_freq, n_mz), dtype=np.float32)
+
+    # Use a single reusable FFT plan and buffers
+    fft_in = pyfftw.empty_aligned(unique_swim_ids, dtype=np.float32)
+    fft_out = pyfftw.empty_aligned(n_freq, dtype=np.complex64)
+    fft_obj = pyfftw.FFTW(fft_in, fft_out, axes=(0,))
+
+    for j in range(n_mz):
+        trace = time_domain[:, j].values.astype(np.float32)
+        trace -= trace.mean()
+
+        fft_in[:] = trace
+        result = fft_obj()
+
+        # Save power spectrum (magnitude squared)
+        fft_power[:, j] = np.abs(result) ** 2
+
+        if j % 10000 == 0:
+            print(f"Processed {j}/{n_mz} mass_charge bins")
+
+    # Create xarray DataArray
+    frequency = np.fft.rfftfreq(unique_swim_ids, instrument_frequency)
+
+    fourier_domain = xr.DataArray(
+        data=fft_power,
+        dims=["frequency", "mass_charge"],
+        coords={"frequency": frequency, "mass_charge": profile_mz},
+        name="amplitude"
+    )
+
+    print('Completed FFT trace-by-trace.')
+    return fourier_domain
+
+def compute_fft_bb(time_domain, unique_swim_ids, profile_mz, instrument_frequency):
     """Compute FFT on the time-domain data."""
     # time_domain_np = time_domain.to_numpy()
     print('got time domain numpy array with shape:', time_domain.shape)
@@ -296,13 +388,14 @@ def compute_fft(time_domain, unique_swim_ids, profile_mz, instrument_frequency):
 
     print(time_domain.shape, time_domain.dtype)
     # in_array = time_domain - mean
-    np.subtract(time_domain, mean, out=in_array)
+    # np.subtract(time_domain, mean, out=in_array)
     # batch the mean subtraction to avoid memory issues
-    # chunk_size = 10000
-    # for i in range(0, time_domain.shape[1], chunk_size):
-    #     print(i)
-    #     sl = slice(i, i + chunk_size)
-    #     np.subtract(time_domain.values[:, sl], mean[:, sl], out=in_array[:, sl])
+    chunk_size = 10000
+
+    for i in range(0, time_domain.shape[1], chunk_size):
+        print("memory footprint of in_array: ", in_array.nbytes / (1024 ** 2), "MB")
+        sl = slice(i, i + chunk_size)
+        np.subtract(time_domain[:, sl], mean[:, sl], out=in_array[:, sl])
 
     print('input array mean subtracted, now performing FFT')
     swim_fft = pyfftw.FFTW(in_array, out_array, axes=(0,))
@@ -326,6 +419,42 @@ def compute_fft(time_domain, unique_swim_ids, profile_mz, instrument_frequency):
 
     return fourier_domain
 
+
+def compute_fft_(time_domain, unique_swim_ids, profile_mz, instrument_frequency):
+    """Compute FFT on the time-domain data."""
+    time_domain_np = time_domain.to_numpy()
+
+    print('got time domain numpy array with shape:', time_domain_np.shape)
+
+    in_array = pyfftw.empty_aligned(
+        (unique_swim_ids, len(profile_mz)), dtype=np.float32
+    )
+
+    print('created input array with shape:', in_array.shape)
+    out_array = pyfftw.empty_aligned(
+        (unique_swim_ids // 2 + 1, len(profile_mz)), dtype=np.complex64
+    )
+
+    print('created output array with shape:', out_array.shape)
+
+    in_array[:, :] = time_domain_np - time_domain_np.mean(axis=0, keepdims=True)
+
+    print('input array mean subtracted, now performing FFT')
+    swim_fft = pyfftw.FFTW(in_array, out_array, axes=(0,))
+    print('FFT setup complete, executing FFT')
+    fft_result = swim_fft()
+    print('FFT execution complete, result shape:', fft_result.shape)
+    fourier_domain = xr.DataArray(
+        data=np.absolute(fft_result) ** 2,
+        dims=["frequency", "mass_charge"],
+        coords={
+            "frequency": np.fft.rfftfreq(unique_swim_ids, instrument_frequency),
+            "mass_charge": profile_mz,
+        },
+        name="amplitude",
+    )
+
+    return fourier_domain
 
 def save_to_netcdf(data_array, file_name):
     """Save xarray DataArray to a NetCDF file."""
@@ -385,13 +514,9 @@ def extract_data(config_file, d_directory, save_location):
     print('saved time-domain data')
 
     # Compute and save Fourier-domain data
-    fourier_domain = compute_fft(
+    fourier_domain = compute_fft_efficient(
         time_domain, unique_swim_ids, profile_mz, instrument_frequency
-    )[10:100, 10:100]
-
-    print("Fourier-domain data computed with shape:", fourier_domain.shape)
-
-
+    )
 
     save_to_netcdf(fourier_domain, file_name.replace("_timedomain", "_fourierdomain"))
 

@@ -74,7 +74,7 @@ class Baf2Sql:
         )
 
         if len == 0:
-            self.throw_last_error(self.dll)
+            self.throw_last_error()
 
         buffer = create_string_buffer(len)
         self.dll.baf2sql_get_sqlite_cache_filename_v2(

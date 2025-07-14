@@ -1,27 +1,25 @@
-FROM ubuntu:22.04
+FROM public.ecr.aws/lambda/python:3.11
 
-# Install dependencies
-RUN apt-get update && apt-get install -y \
-    python3 \
-    python3-pip \
-    libgomp1 \
-    libstdc++6 \
-    libgcc-s1 \
-    libc6 \
-    && apt-get clean
+RUN yum install -y \
+    libgomp \
+    libstdc++ \
+    libgcc \
+    && yum clean all
 
 # Set work directory
 WORKDIR /var/task
 
 # Copy files
-COPY . .
-COPY ./lambda_package/libbaf2sql_c.so .
-COPY ./lambda_package/lambda_handler.py .
-COPY ./lambda_package/lambda_runner.py .
-
+COPY requirements.txt .
 
 # Install Python requirements
-RUN pip install -r requirements.txt
+RUN pip3 install -r ./requirements.txt --target .
+
+COPY src/ .
+COPY 250702_davaoH2O_021.d /input_data/
+
+## Default command for debugging or Lambda-style call
+CMD ["handler.lambda_handler"]
 
 # Default command for debugging or Lambda-style call
-CMD ["python3", "lambda_handler.py"]
+#CMD ["python3", "handler.lambda_handler.py"]
