@@ -11,14 +11,23 @@ file conversion.
 
 ### Windows, Linux 
 
-If you are on Windows or Linux AMD64 you can run the code directly. You will need to install the 
-required Python packages using 
+If you are on Windows or Linux AMD64 you can run the code directly. Once you have cloned the 
+repository, navigate to the downloaded files and create a virtual environment using conda: 
+
+```bash
+conda create -n dot_d_to_nc python=3.10
+conda activate dot_d_to_nc
+```
+
+You will then need to install the required Python packages using 
 
 ```python
 pip install -r requirements.txt
 ```
 
-You can then run the code on your PC. You have two options: if you want to just process a single 
+You can then run the code on your PC. Bear in mind you need to be in the virtual environment for 
+this to run (started using ```conda activate dot_d_to_nc```). You have two options: if you want to 
+just process a single 
 file, you can use the flag ```--single``` and run the following command in the root of the project: 
 
 ```python 
@@ -39,8 +48,6 @@ python ./src/extract.py --directory INPUT_DIR OUTPUT
 ```
 This will process all the .d directories in the `INPUT_DIR` directory and save the output in the 
 output directory `OUTPUT`.
-
-
 
 
 
