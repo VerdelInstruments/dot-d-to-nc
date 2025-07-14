@@ -46,6 +46,14 @@ the name of the input ```.d``` directory.
 Since the Bruker software is not available for Mac, you can use Docker to run the code in a 
 Linux container. To begin with, you must have Docker installed. 
 
+**NOTE**: This is a highly memory-intensive program. You need to make sure that you have set 
+Docker's memory limit to around 15 GB. 
+
+To set the memory limit for Docker: 
+- On macOS or Windows, open Docker Desktop
+- Go to: Settings > Resources > Memory
+- Increase to 16 GB and click "Apply & Restart"
+
 You must then build the Docker image, using this command: 
 
 ```bash
