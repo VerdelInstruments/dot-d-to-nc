@@ -19,6 +19,10 @@ COPY requirements.txt .
 # Install Python requirements
 RUN pip3 install -r ./requirements.txt --target .
 
+# Install boto3 for S3 operations
+RUN pip3 install boto3 --target .
+
 COPY src/ .
+COPY extract_s3.py .
 
 CMD ["python3", "extract.py"]

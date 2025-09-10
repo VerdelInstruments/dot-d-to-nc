@@ -1,0 +1,7 @@
+.terraform/
+*.tfstate
+*.tfstate.backup
+.terraform.lock.hcl
+.DS_Store
+250702_davaoH2O_021.d/
+task-definition-final.json

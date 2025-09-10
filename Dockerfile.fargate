@@ -1,0 +1,14 @@
+# Use the existing conversion-service image as base
+FROM conversion-service:latest
+
+# Install boto3 for S3 operations
+RUN pip install boto3
+
+# Copy the S3-enabled extraction script
+COPY extract_s3.py /var/task/extract_s3.py
+
+# Set the working directory
+WORKDIR /var/task
+
+# Default command (can be overridden)
+CMD ["python3", "extract_s3.py", "--help"]

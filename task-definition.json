@@ -1,0 +1,43 @@
+{
+  "family": "conversion-service-task",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "4096",
+  "memory": "30720",
+  "executionRoleArn": "arn:aws:iam::YOUR_ACCOUNT_ID:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::YOUR_ACCOUNT_ID:role/ecsTaskRole", 
+  "containerDefinitions": [
+    {
+      "name": "conversion-service",
+      "image": "YOUR_ACCOUNT_ID.dkr.ecr.YOUR_REGION.amazonaws.com/conversion-service:latest",
+      "cpu": 4096,
+      "memory": 30720,
+      "essential": true,
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/conversion-service",
+          "awslogs-region": "YOUR_REGION",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "environment": [
+        {
+          "name": "INPUT_BUCKET",
+          "value": "YOUR_INPUT_BUCKET"
+        },
+        {
+          "name": "OUTPUT_BUCKET", 
+          "value": "YOUR_OUTPUT_BUCKET"
+        }
+      ],
+      "command": [
+        "python3",
+        "extract.py",
+        "--single",
+        "/tmp/input_data",
+        "/tmp/output"
+      ]
+    }
+  ]
+}
