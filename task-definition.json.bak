@@ -4,12 +4,12 @@
   "requiresCompatibilities": ["FARGATE"],
   "cpu": "4096",
   "memory": "30720",
-  "executionRoleArn": "arn:aws:iam::987686461587:role/ecsTaskExecutionRole",
-  "taskRoleArn": "arn:aws:iam::987686461587:role/ecsTaskRole", 
+  "executionRoleArn": "arn:aws:iam::YOUR_ACCOUNT_ID:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::YOUR_ACCOUNT_ID:role/ecsTaskRole", 
   "containerDefinitions": [
     {
       "name": "conversion-service",
-      "image": "987686461587.dkr.ecr.eu-west-2.amazonaws.com/conversion-service:latest",
+      "image": "YOUR_ACCOUNT_ID.dkr.ecr.YOUR_REGION.amazonaws.com/conversion-service:latest",
       "cpu": 4096,
       "memory": 30720,
       "essential": true,
@@ -17,18 +17,18 @@
         "logDriver": "awslogs",
         "options": {
           "awslogs-group": "/ecs/conversion-service",
-          "awslogs-region": "eu-west-2",
+          "awslogs-region": "YOUR_REGION",
           "awslogs-stream-prefix": "ecs"
         }
       },
       "environment": [
         {
           "name": "INPUT_BUCKET",
-          "value": "conversion-service-input-7v5plwgs"
+          "value": "YOUR_INPUT_BUCKET"
         },
         {
           "name": "OUTPUT_BUCKET", 
-          "value": "conversion-service-output-7v5plwgs"
+          "value": "YOUR_OUTPUT_BUCKET"
         }
       ],
       "command": [
