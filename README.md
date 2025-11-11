@@ -77,4 +77,26 @@ docker run --platform linux/amd64 -v "$(pwd)/INPUT.d:/input" -v "$(pwd)/output:/
 conversion-service python3 extract.py /input /output
 ```
 
-when you are in the root of the directory. 
+when you are in the root of the directory.
+
+## Output Validation
+
+After processing, you can validate the output NetCDF files to ensure they were generated correctly:
+
+```bash
+# Validate a single file
+python src/validate_netcdf.py output/sample_timedomain.nc
+
+# Validate all files in output directory
+python src/validate_netcdf.py output/ --batch
+
+# Validate files and check paired time/Fourier domain consistency
+python src/validate_netcdf.py output/ --batch --check-pairs --verbose
+```
+
+The validation script checks:
+- File structure (correct dimensions, coordinates, data types)
+- Data quality (no NaN, infinity, or negative values)
+- Paired file consistency (matching m/z coordinates, correct FFT dimensions)
+
+For detailed validation documentation, see [VALIDATION_GUIDE.md](VALIDATION_GUIDE.md). 
