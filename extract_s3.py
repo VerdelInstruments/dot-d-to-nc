@@ -77,19 +77,37 @@ if __name__ == '__main__':
             
             # Process the data
             print(f"Processing data from {input_dir} to {output_dir}/converted_data.nc")
-            output_file = extract_data(input_dir, output_dir)
+            timedomain_file = extract_data(input_dir, output_dir)
+            fourierdomain_file = timedomain_file.replace('_timedomain', '_fourierdomain')
             
-            # Generate output key if not provided
+            # Generate output keys if not provided
             if not args.output_key:
                 input_name = Path(args.input_key).stem
-                args.output_key = f"{input_name}_converted.nc"
-            
-            # Upload result to S3
-            if os.path.exists(output_file):
-                upload_to_s3(output_file, args.output_bucket, args.output_key)
-                print(f"Successfully uploaded result to s3://{args.output_bucket}/{args.output_key}")
+                timedomain_key = f"{input_name}_timedomain.nc"
+                fourierdomain_key = f"{input_name}_fourierdomain.nc"
             else:
-                print(f"Error: Output file {output_file} was not created")
+                timedomain_key = args.output_key.replace('.nc', '_timedomain.nc')
+                fourierdomain_key = args.output_key.replace('.nc', '_fourierdomain.nc')
+            
+            # Upload both files to S3
+            uploaded_files = []
+            if os.path.exists(timedomain_file):
+                upload_to_s3(timedomain_file, args.output_bucket, timedomain_key)
+                print(f"Successfully uploaded timedomain to s3://{args.output_bucket}/{timedomain_key}")
+                uploaded_files.append('timedomain')
+            else:
+                print(f"Warning: Timedomain file {timedomain_file} was not created")
+            
+            if os.path.exists(fourierdomain_file):
+                upload_to_s3(fourierdomain_file, args.output_bucket, fourierdomain_key)
+                print(f"Successfully uploaded fourierdomain to s3://{args.output_bucket}/{fourierdomain_key}")
+                uploaded_files.append('fourierdomain')
+            else:
+                print(f"Error: Fourierdomain file {fourierdomain_file} was not created")
+                sys.exit(1)
+            
+            if not uploaded_files:
+                print(f"Error: No output files were created")
                 sys.exit(1)
                 
         except Exception as e:
