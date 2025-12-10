@@ -74,10 +74,31 @@ if __name__ == '__main__':
             # Download input data from S3
             print(f"Downloading from s3://{args.input_bucket}/{args.input_key}")
             download_from_s3(args.input_bucket, args.input_key, input_dir)
-            
+
+            # Find the .d directory (user may upload with or without .d folder)
+            # Look for any .d directory first
+            d_dirs = [d for d in Path(input_dir).rglob('*.d') if d.is_dir()]
+
+            if d_dirs:
+                # Use the first .d directory found
+                data_dir = str(d_dirs[0])
+                print(f"Found .d directory: {data_dir}")
+            else:
+                # No .d directory found - files may be uploaded flat
+                # Check if we have BAF files directly in input_dir
+                baf_files = list(Path(input_dir).glob('*.baf'))
+                if baf_files:
+                    data_dir = input_dir
+                    print(f"No .d directory found, using flat structure: {data_dir}")
+                else:
+                    raise FileNotFoundError(
+                        f"No .d directory or BAF files found in {input_dir}. "
+                        f"Please upload either a .d folder or BAF files directly."
+                    )
+
             # Process the data
-            print(f"Processing data from {input_dir} to {output_dir}/converted_data.nc")
-            timedomain_file = extract_data(input_dir, output_dir)
+            print(f"Processing data from {data_dir} to {output_dir}/converted_data.nc")
+            timedomain_file = extract_data(data_dir, output_dir)
             fourierdomain_file = timedomain_file.replace('_timedomain', '_fourierdomain')
             
             # Generate output keys if not provided
