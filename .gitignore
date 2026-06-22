@@ -5,3 +5,12 @@
 .DS_Store
 250702_davaoH2O_021.d/
 task-definition-final.json
+
+# d2nc spike test artifacts
+d2nc_out/
+*.nc
+*.d/
+
+# python
+__pycache__/
+*.pyc

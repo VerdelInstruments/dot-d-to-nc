@@ -52,6 +52,10 @@ if __name__ == '__main__':
     parser.add_argument('--output-bucket', required=True, help="S3 bucket for output files")
     parser.add_argument('--input-key', required=True, help="S3 key (path) to the .d directory")
     parser.add_argument('--output-key', help="S3 key for output file (optional, will auto-generate)")
+    parser.add_argument('--unique-swim-ids', type=int, default=2048,
+                        help="Number of SWIM pulses (default 2048)")
+    parser.add_argument('--instrument-frequency', type=float, default=1.0,
+                        help="Instrument sampling interval for the FFT (default 1.0)")
 
     args = parser.parse_args()
     
@@ -75,9 +79,16 @@ if __name__ == '__main__':
             print(f"Downloading from s3://{args.input_bucket}/{args.input_key}")
             download_from_s3(args.input_bucket, args.input_key, input_dir)
 
+            # Debug: List downloaded structure
+            print(f"DEBUG - Contents of input_dir after download:")
+            for item in Path(input_dir).rglob('*'):
+                print(f"  {item} (dir: {item.is_dir()})")
+
             # Find the .d directory (user may upload with or without .d folder)
             # Look for any .d directory first
-            d_dirs = [d for d in Path(input_dir).rglob('*.d') if d.is_dir()]
+            d_dirs = [d for d in Path(input_dir).rglob('*') if d.is_dir() and d.name.endswith('.d')]
+
+            print(f"DEBUG - Found {len(d_dirs)} .d directories: {d_dirs}")
 
             if d_dirs:
                 # Use the first .d directory found
@@ -98,7 +109,8 @@ if __name__ == '__main__':
 
             # Process the data
             print(f"Processing data from {data_dir} to {output_dir}/converted_data.nc")
-            timedomain_file = extract_data(data_dir, output_dir)
+            timedomain_file = extract_data(data_dir, output_dir,
+                                           args.unique_swim_ids, args.instrument_frequency)
             fourierdomain_file = timedomain_file.replace('_timedomain', '_fourierdomain')
             
             # Generate output keys if not provided
